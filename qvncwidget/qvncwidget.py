@@ -1,27 +1,13 @@
 import logging
 
-from PyQt5.QtCore import (
-    QSize,
-    Qt,
-    pyqtSignal
-)
-from PyQt5.QtGui import (
-    QImage,
-    QPaintEvent,
-    QPainter,
-    QPixmap,
-    QResizeEvent,
-    QKeyEvent,
-    QMouseEvent
-)
-
-from PyQt5.QtWidgets import (
-    QApplication,
-    QLabel,
-    QMainWindow,
-    QWidget
-)
-
+try:
+    from PyQt5.QtCore import (QSize, Qt, pyqtSignal)
+    from PyQt5.QtGui import (QImage, QPaintEvent, QPainter, QPixmap,
+        QResizeEvent, QKeyEvent, QMouseEvent)
+    from PyQt5.QtWidgets import (QLabel)
+except ImportError as err:
+    raise SystemExit("%s" % err)
+    
 from qvncwidget.rfb import RFBClient
 from qvncwidget.rfbhelpers import RFBPixelformat, RFBInput
 
@@ -38,16 +24,11 @@ class QVNCWidget(QLabel, RFBClient):
     onKeyPress = pyqtSignal(QKeyEvent)
     onKeyRelease = pyqtSignal(QKeyEvent)
 
-    def __init__(self, parent, 
-                host, port=5900, password: str=None,
-                mouseTracking=False):
-        super().__init__(
-            parent=parent,
-            host=host,
-            port=port,
-            password=password,
-            daemonThread=True
-        )
+    def __init__(self, host, port=5900, password: str=None,
+                mouseTracking=False, parent=None):
+        super(QVNCWidget, self).__init__(parent=parent,
+            host=host, port=port, password=password,
+            daemonThread=True)
         #import faulthandler
         #faulthandler.enable()
         self.screen: QImage = None

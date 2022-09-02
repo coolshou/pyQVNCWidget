@@ -8,6 +8,11 @@ http://www.realvnc.com/docs/rfbproto.pdf
 
 https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst
 """
+try:
+    from PyQt5.QtCore import QObject
+    from PyQt5.QtCore import (pyqtSignal)
+except ImportError as err:
+    raise SystemExit(err)
 
 from qvncwidget.rfbhelpers import RFBPixelformat, RFBRectangle
 from qvncwidget.rfbdes import RFBDes
@@ -52,7 +57,8 @@ KNOWN_VERSIONS = [
 
 MAX_BUFF_SIZE: int = 10*1024*1024 # 10MB
 
-class RFBClient:
+class RFBClient(QObject):
+#class RFBClient():    
 
     log = logging.getLogger("RFB Client")
     logc = logging.getLogger("RFB -> Server")
@@ -66,12 +72,14 @@ class RFBClient:
     _requestFrameBufferUpdate = False
     _incrementalFrameBufferUpdate = True
 
-    def __init__(self, host, port=5900,
-                password: str=None,
-                sharedConnection=True,
-                keepRequesting=True,
-                requestIncremental=True,
-                daemonThread=False):
+    onUpdateClipboard = pyqtSignal(str)
+
+    onErrorConnect = pyqtSignal(int, str)
+
+    def __init__(self, host, port=5900, password: str=None,
+                sharedConnection=True, keepRequesting=True,
+                requestIncremental=True, daemonThread=False, parent=None):
+        super(RFBClient, self).__init__(parent)
         self.host = host
         self.port = port
         self.password = password
@@ -96,13 +104,18 @@ class RFBClient:
         return buffer
 
     def __send(self, data: bytes):
+        # send data to server
         self.connection.send(data)
-        self.logc.debug(data)
+        # self.logc.debug(data)
 
     def __start(self):
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connection.connect( (self.host, self.port) )
-        self._handleInitial()
+        try:
+            self.connection.connect( (self.host, self.port) )
+            self._handleInitial()
+        except Exception as err:
+            self.log.debug(err)
+            self.onErrorConnect.emit(-1, err)
 
     def __close(self):
         self.log.debug("Closing connection")
@@ -269,11 +282,12 @@ class RFBClient:
 
         self.log.debug(f"Server clipboard: {data}")
         # TODO: create callback
+        self.onUpdateClipboard.emit(data)
 
     def _handleFramebufferUpdate(self, data: bytes):
         self.numRectangles = s.unpack("!xH", data)[0]
 
-        self.log.debug(f"numRectangles: {self.numRectangles}")
+        # self.log.debug(f"numRectangles: {self.numRectangles}")
 
         self.onBeginUpdate()
         self._handlePostFramebufferUpdate()
@@ -294,7 +308,7 @@ class RFBClient:
         #self.rectanglePositions.append(rect)
 
         if encoding == c.RAW_ENCODING:
-            self.log.debug(f"expected size: {width*height*self.pixformat.bytespp}")
+            # self.log.debug(f"expected size: {width*height*self.pixformat.bytespp}")
             self._decodeRAW(
                 self.__recv(expectedSize=width*height*self.pixformat.bytespp),
                 rect
@@ -355,7 +369,7 @@ class RFBClient:
            now at (x-position, y-position), and the current state of buttons 1 to 8 are represented
            by bits 0 to 7 of button-mask respectively, 0 meaning up, 1 meaning down (pressed)
         """
-        self.log.debug(f"pointerEvent: {x}, {y}, {buttommask}")
+        # self.log.debug(f"pointerEvent: {x}, {y}, {buttommask}")
 
         self.__send(s.pack(
             "!BBHH",
